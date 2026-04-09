@@ -3,55 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Investigação Global</title>
+    <title>OmniSearch | Busca de Dados</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
 </head>
 <body>
-    <div class="main-container">
+    <div class="background-elements">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <main class="container">
         <header>
             <div class="logo">
-                <i class="ri-radar-line"></i>
-                <h1>DataWeb Search</h1>
+                <i class="ri-global-line"></i>
+                <h1>Omni<span>Search</span></h1>
             </div>
-            <p>Busque dados públicos, processos e redes sociais de qualquer nome em tempo real</p>
+            <p>Sistema Avançado de Pesquisa</p>
         </header>
 
         <section class="search-section">
-            <div class="search-wrapper">
-                <i class="ri-user-search-line search-icon"></i>
-                <input type="text" id="searchInput" placeholder="Digite o nome completo de qualquer pessoa..." autocomplete="off">
-                <button id="searchBtn">Rastrear</button>
+            <div class="search-bar-container">
+                <i class="ri-search-2-line search-icon"></i>
+                <input type="text" id="searchInput" placeholder="Digite o nome completo da pessoa..." autocomplete="off">
+                <button id="searchBtn">Buscar</button>
             </div>
         </section>
 
-        <section id="resultsContainer" class="results-container">
-            <div id="loader" class="loader hidden">
+        <section class="results-container" id="resultsContainer">
+            <div class="loader hidden" id="loader">
                 <div class="spinner"></div>
-                <p>Mapeando pegadas digitais na internet...</p>
-                <div class="loading-steps">
-                    <span><i class="ri-check-line"></i> Conectando a redes sociais...</span>
-                    <span><i class="ri-check-line"></i> Consultando registros jurídicos...</span>
-                    <span><i class="ri-check-line"></i> Verificando motores de busca...</span>
-                </div>
+                <p>Processando e extraindo dados em tempo real...</p>
             </div>
-
+            
             <div id="resultsContent" class="results-content hidden">
-                <!-- Data goes here -->
+                <!-- Resultados serão preenchidos via JS -->
             </div>
 
             <div id="noResults" class="no-results hidden">
-                <div class="icon-circle">
-                    <i class="ri-error-warning-line"></i>
-                </div>
-                <h2>Termo inválido</h2>
-                <p>Por favor, insira um nome válido para rastrear pela internet.</p>
+                <i class="ri-error-warning-line"></i>
+                <h2>Nenhum registro encontrado</h2>
+                <p>Nenhuma Pegada Digital consistente encontrada na web profunda.</p>
             </div>
         </section>
-    </div>
+    </main>
 
     <script src="script.js"></script>
 </body>
