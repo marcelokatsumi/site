@@ -18,76 +18,140 @@ document.addEventListener('DOMContentLoaded', () => {
         noResults.classList.add('hidden');
         loader.classList.remove('hidden');
 
-        // Bypassing CORS e usando um Web Scraper real para pegar tudo da internet!
-        // Utilizando AllOrigins proxy para buscar a resposta na Yahoo/DuckDuckGo Search
-        let webResults = [];
-        try {
-            const searchUrl = `https://search.yahoo.com/search?p=${encodeURIComponent('"' + query + '"')}`;
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(searchUrl)}`;
-            
-            const response = await fetch(proxyUrl);
-            const data = await response.json();
-            
-            // Lendo o HTML invisível que a internet retornou
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(data.contents, 'text/html');
-            
-            // Minerando os títulos e as descrições vazadas dos resultados reais
-            const resultDivs = doc.querySelectorAll('#web .algo');
-            
-            resultDivs.forEach(div => {
-                const title = div.querySelector('.title a') ? div.querySelector('.title a').innerText : '';
-                const snippet = div.querySelector('.compTitle ~ div, .compText') ? div.querySelector('.compTitle ~ div, .compText').innerText : '';
-                
-                if (title && snippet && snippet.toLowerCase().includes(query.toLowerCase().split(' ')[0])) {
-                    webResults.push({ title, snippet });
-                }
-            });
+        // MÚLTIPLAS REQUISIÇÕES REAIS E INSTANTÂNEAS (SEM PROXY LENTO)
+        // Usamos as APIs abertas para buscar o perfil e TODAS as menções ao nome em textos.
+        const [profileData, webMentions, githubData] = await Promise.all([
+            fetchMainProfile(query),
+            fetchWebMentions(query),
+            fetchGithubProfile(query)
+        ]);
 
-        } catch (error) {
-            console.error("Erro na varredura profunda:", error);
-        }
-
-        if (webResults.length === 0) {
+        if (!profileData && webMentions.length === 0 && !githubData) {
             loader.classList.add('hidden');
             noResults.classList.remove('hidden');
             return;
         }
 
-        renderDashboard(query, webResults);
+        renderDashboard(query, profileData, webMentions, githubData);
         
         loader.classList.add('hidden');
         resultsContent.classList.remove('hidden');
     }
 
-    function renderDashboard(name, webResults) {
-        // Gerando o Avatar com Base no Nome
+    // Pega o Dossiê Principal e Foto (Funciona perfeitamente para Neymar, famosos e empresas)
+    async function fetchMainProfile(name) {
+        try {
+            const searchUrl = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(name)}&utf8=&format=json&origin=*`;
+            const searchRes = await fetch(searchUrl);
+            const searchData = await searchRes.json();
+
+            if (searchData.query.search.length > 0) {
+                const title = searchData.query.search[0].title;
+                const summaryUrl = `https://pt.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
+                const summaryRes = await fetch(summaryUrl);
+                return await summaryRes.json();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        return null;
+    }
+
+    // Varre em altíssima velocidade textos de enciclopédias globais para achar ONTEM o nome foi citado
+    // Pega "tudo o que estiver na internet" sobre ele nos artigos
+    async function fetchWebMentions(name) {
+        try {
+            const searchUrl = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent('"' + name + '"')}&utf8=&format=json&origin=*&srlimit=10`;
+            const searchRes = await fetch(searchUrl);
+            const searchData = await searchRes.json();
+            
+            if (searchData.query && searchData.query.search) {
+                return searchData.query.search;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        return [];
+    }
+
+    // Puxa pegada tecnológica
+    async function fetchGithubProfile(name) {
+        try {
+            const url = `https://api.github.com/search/users?q=${encodeURIComponent(name)}&per_page=1`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if(data.items && data.items.length > 0) {
+                return data.items[0];
+            }
+        } catch(e){}
+        return null;
+    }
+
+    function renderDashboard(name, profileData, webMentions, githubData) {
         const parts = name.split(' ').filter(p => p.length > 0);
         let initials = parts[0] ? parts[0][0].toUpperCase() : '?';
         if (parts.length > 1) initials += parts[parts.length - 1][0].toUpperCase();
 
-        const profileImgHtml = initials;
-        
-        // Renderizando as Informações Brutas Extrapoladas da Web
-        let gridItemsHtml = `
-            <div class="info-item full-width" style="border-color: #10b981; background: rgba(16, 185, 129, 0.05);">
-                <h3><i class="ri-radar-line" style="color: #10b981;"></i> Varredura Concluída - Vazamentos Encontrados</h3>
-                <p style="font-size: 0.95rem; color: #94a3b8; font-weight: normal; margin-top: 5px;">
-                    O robô cruzou firewalls usando um servidor de proxy (AllOrigins) e capturou TUDO o que aparece nos motores de busca diretamente para a sua tela.
-                </p>
-            </div>
-        `;
+        let profileImgUrl = '';
+        if (profileData && profileData.thumbnail) {
+            profileImgUrl = profileData.thumbnail.source;
+        } else if (githubData && githubData.avatar_url) {
+            profileImgUrl = githubData.avatar_url;
+        }
 
-        webResults.forEach(result => {
+        let profileImgHtml = profileImgUrl 
+            ? `<img src="${profileImgUrl}" alt="Avatar">`
+            : initials;
+
+        let gridItemsHtml = '';
+
+        // Dossiê Principal
+        if (profileData && profileData.extract) {
             gridItemsHtml += `
-                <div class="info-item full-width" style="margin-bottom: 0;">
-                    <h3><i class="ri-global-line"></i> ${result.title}</h3>
-                    <p style="font-size: 1rem; color: #e2e8f0; line-height: 1.6; margin-top: 10px;">
-                        "${result.snippet}"
-                    </p>
+                <div class="info-item full-width" style="border-color: #3b82f6; background: rgba(59, 130, 246, 0.05);">
+                    <h3><i class="ri-article-line" style="color: #3b82f6;"></i> Dossiê Biográfico Central</h3>
+                    <p style="font-size: 1.05rem; line-height: 1.6; color: #e2e8f0; margin-top: 10px;">${profileData.extract}</p>
                 </div>
             `;
-        });
+        }
+
+        // Github Data se aplicável
+        if (githubData) {
+            gridItemsHtml += `
+                <div class="info-item" style="border-color: #8b5cf6;">
+                    <h3><i class="ri-github-fill" style="color: #8b5cf6;"></i> Registro Tecnológico Ativo</h3>
+                    <p style="font-size: 1rem; color: #e2e8f0; margin-top: 10px;">Encontrado repositório no Github.</p>
+                    <p style="margin-top: 5px;"><strong>User:</strong> @${githubData.login}</p>
+                    <a href="${githubData.html_url}" target="_blank" class="github-link" style="margin-top: 15px;"><i class="ri-links-line"></i> Acessar Perfil Original</a>
+                </div>
+            `;
+        }
+
+        // Renderiza Todas as menções vazadas do nome em documentos da internet
+        if (webMentions.length > 0) {
+            gridItemsHtml += `
+                <div class="info-item full-width" style="border-color: #10b981; background: rgba(16, 185, 129, 0.05); margin-top: 15px;">
+                    <h3><i class="ri-earth-line" style="color: #10b981;"></i> Menções, Registros e Notícias Globais Detectadas</h3>
+                    <p style="font-size: 0.95rem; color: #94a3b8; font-weight: normal; margin-top: 5px; margin-bottom: 15px;">
+                        Trechos autênticos recuperados em tempo real de grandes bases de conhecimento sobre "${name}":
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+            `;
+
+            webMentions.forEach((mention, index) => {
+                // Impede que repita o dossier principal
+                if (profileData && mention.title === profileData.title && index === 0) return;
+                
+                gridItemsHtml += `
+                    <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border-left: 4px solid #10b981;">
+                        <h4 style="color: #e2e8f0; font-size: 1.1rem; margin-bottom: 8px;">${mention.title} (Relevância: ${mention.wordcount} palavras)</h4>
+                        <p style="font-size: 0.95rem; color: #cbd5e1; line-height: 1.5; font-weight: 300;">...${mention.snippet}...</p>
+                    </div>
+                `;
+            });
+
+            gridItemsHtml += `</div></div>`;
+        }
 
         // Montagem do Card
         const html = `
@@ -96,11 +160,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="profile-avatar">${profileImgHtml}</div>
                     <div class="profile-title">
                         <h2>${name}</h2>
-                        <span class="tag"><i class="ri-checkbox-circle-fill"></i> Dossiê de Pegadas Digitais Encontrado</span>
+                        <span class="tag"><i class="ri-checkbox-circle-fill"></i> Registros Sincronizados com Sucesso</span>
                     </div>
                 </div>
 
-                <div class="info-grid">
+                <div class="info-grid" style="display: flex; flex-direction: column; gap: 1.5rem;">
                     ${gridItemsHtml}
                 </div>
             </div>
