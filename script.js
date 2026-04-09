@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBtn = document.getElementById('searchBtn');
     const loader = document.getElementById('loader');
     const resultsContent = document.getElementById('resultsContent');
-    const noResults = document.getElementById('noResults');
 
     searchBtn.addEventListener('click', handleSearch);
     searchInput.addEventListener('keypress', (e) => {
@@ -14,18 +13,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const query = searchInput.value.trim();
         if (!query) return;
 
-        showLoader();
+        resultsContent.classList.add('hidden');
+        loader.classList.remove('hidden');
 
-        // O processo de varredura demora um pouco por conta as várias conexões.
-        // Simulamos o tempo de carregamento com setTimeout para não sobrecarregar o navegador antes de renderizar os links de acesso rápido.
-        setTimeout(async () => {
-            const wikiData = await checkWikipedia(query);
-            renderDashboard(query, wikiData);
-        }, 3500); // 3.5 sec loader
+        // Extrair o primeiro nome para a estatística global
+        const firstName = query.split(' ')[0] || query;
+
+        // Disparando MÚLTIPLAS APIs gratuitas reais em paralelo (O MÁXIMO POSSÍVEL NO CLIENTE)
+        const [wikiData, demoData, githubData] = await Promise.all([
+            fetchWikipedia(query),
+            fetchDemographics(firstName),
+            fetchGithub(query)
+        ]);
+
+        renderDashboard(query, wikiData, demoData, githubData);
+        
+        loader.classList.add('hidden');
+        resultsContent.classList.remove('hidden');
     }
 
-    // Apenas checar se existe foto ou biografia rápida no Wikipedia (figuras famosas)
-    async function checkWikipedia(name) {
+    // 1. DADOS REAIS: API WIKIPEDIA (Resumo e Foto Pública)
+    async function fetchWikipedia(name) {
         try {
             const searchUrl = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(name)}&utf8=&format=json&origin=*`;
             const searchRes = await fetch(searchUrl);
@@ -33,37 +41,102 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (searchData.query.search.length > 0) {
                 const title = searchData.query.search[0].title;
+                // Exige que ao menos parte do nome buscado bata com o título, para evitar falsos positivos estranhos
                 if (title.toLowerCase().includes(name.split(' ')[0].toLowerCase())) {
                     const summaryUrl = `https://pt.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
                     const summaryRes = await fetch(summaryUrl);
                     return await summaryRes.json();
                 }
             }
-        } catch (e) {}
-        return null; // Nada na Wiki
+        } catch (e) {} return null;
     }
 
-    function renderDashboard(name, wikiData) {
+    // 2. DADOS REAIS: Dados Estatísticos e Demográficos de Bancos Preditivos e IBGE/Mundial
+    async function fetchDemographics(name) {
+        try {
+            const responses = await Promise.all([
+                fetch(`https://api.agify.io/?name=${name}`).then(r => r.json()),
+                fetch(`https://api.genderize.io/?name=${name}`).then(r => r.json()),
+                fetch(`https://api.nationalize.io/?name=${name}`).then(r => r.json())
+            ]);
+            return {
+                age: responses[0].age || "N/A",
+                gender: responses[1].gender === 'male' ? 'Masculino' : responses[1].gender === 'female' ? 'Feminino' : 'Desconhecido',
+                nationality: responses[2].country[0] ? responses[2].country[0].country_id : "N/A"
+            };
+        } catch(e) { return null; }
+    }
+
+    // 3. DADOS REAIS: Pegada Tecnológica no GitHub
+    async function fetchGithub(name) {
+        try {
+            // Busca usuários compatíveis com a string do nome
+            const url = `https://api.github.com/search/users?q=${encodeURIComponent(name)}&per_page=1`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if(data.items && data.items.length > 0) {
+                const userObj = data.items[0];
+                return {
+                    login: userObj.login,
+                    avatar: userObj.avatar_url,
+                    html_url: userObj.html_url
+                };
+            }
+        } catch(e){} return null;
+    }
+
+    function renderDashboard(name, wikiData, demoData, githubData) {
         const encodedName = encodeURIComponent(name);
-        // Colocando o nome entre aspas para forçar buscadores a procurar a frase exata
         const exactNameParams = encodeURIComponent(`"${name}"`);
 
-        // Geração das iniciais caso não tenha foto
         const parts = name.split(' ').filter(p => p.length > 0);
         let initials = parts[0] ? parts[0][0].toUpperCase() : '?';
-        if (parts.length > 1) {
-            initials += parts[parts.length - 1][0].toUpperCase();
-        }
+        if (parts.length > 1) initials += parts[parts.length - 1][0].toUpperCase();
 
-        // Variáveis de perfil base
         let profileImg = `<div class="profile-avatar">${initials}</div>`;
-        let bio = "Monitoramento ativo. Utilize os motores de rastreamento abaixo para visualizar informações detalhadas em tempo real.";
+        let bio = "Dados coletados via fontes abertas e predição demográfica.";
 
         if (wikiData && wikiData.thumbnail) {
             profileImg = `<div class="profile-avatar"><img src="${wikiData.thumbnail.source}"></div>`;
             bio = wikiData.description ? wikiData.description : bio;
         }
 
+        // HTML dos Dados Extraídos
+        let statsHtml = '';
+        if (demoData) {
+            statsHtml = `
+                <h3 class="section-title"><i class="ri-bar-chart-box-line"></i> Análise de Inteligência Demográfica (Baseado no nome principal)</h3>
+                <div class="data-insight-grid">
+                    <div class="insight-box">
+                        <h4><i class="ri-user-smile-line"></i> Idade Provável</h4>
+                        <p>${demoData.age} anos</p>
+                    </div>
+                    <div class="insight-box">
+                        <h4><i class="ri-men-line"></i> Gênero Biológico</h4>
+                        <p>${demoData.gender}</p>
+                    </div>
+                    <div class="insight-box">
+                        <h4><i class="ri-map-pin-line"></i> País de Origem ID</h4>
+                        <p>${demoData.nationality}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        let gitHtml = '';
+        if (githubData) {
+            gitHtml = `
+                <div class="github-card">
+                    <img src="${githubData.avatar}" alt="Github Avatar">
+                    <div class="github-info">
+                        <h4>Conta GitHub Localizada na Web!</h4>
+                        <a href="${githubData.html_url}" target="_blank"><i class="ri-github-fill"></i> @${githubData.login} - Ver Perfil Completo</a>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Montagem Final do HTML
         const html = `
             <div class="osint-card">
                 <div class="osint-header">
@@ -74,60 +147,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
 
-                <div class="osint-grid">
-                    <!-- Redes Sociais -->
-                    <div class="tool-category">
-                        <h3><i class="ri-share-line"></i> Mídias e Redes Sociais</h3>
-                        <div class="link-list">
-                            <a href="https://www.linkedin.com/search/results/all/?keywords=${exactNameParams}" target="_blank" class="scan-btn">
-                                <span><i class="ri-linkedin-box-fill brand"></i> LinkedIn</span>
-                                <i class="ri-external-link-line arrow"></i>
-                            </a>
-                            <a href="https://www.facebook.com/search/people?q=${encodedName}" target="_blank" class="scan-btn">
-                                <span><i class="ri-facebook-circle-fill brand"></i> Facebook</span>
-                                <i class="ri-external-link-line arrow"></i>
-                            </a>
-                            <a href="https://www.instagram.com/explore/search/keyword/?q=${encodedName}" target="_blank" class="scan-btn">
-                                <span><i class="ri-instagram-line brand"></i> Instagram</span>
-                                <i class="ri-external-link-line arrow"></i>
-                            </a>
-                            <a href="https://twitter.com/search?q=${exactNameParams}&src=typed_query" target="_blank" class="scan-btn">
-                                <span><i class="ri-twitter-x-fill brand"></i> X / Twitter</span>
-                                <i class="ri-external-link-line arrow"></i>
-                            </a>
-                        </div>
-                    </div>
+                ${statsHtml}
+                ${gitHtml}
 
-                    <!-- Dados Oficiais e Jurídicos -->
+                <h3 class="section-title"><i class="ri-radar-line"></i> Hub OSINT - Busca Profunda em Sistemas Brasileiros</h3>
+                <div class="osint-grid">
                     <div class="tool-category">
-                        <h3><i class="ri-government-line"></i> Registros Públicos & Jurídicos</h3>
+                        <h3>Processos (Jusbrasil & Escavador)</h3>
                         <div class="link-list">
                             <a href="https://www.jusbrasil.com.br/consulta-processual/busca?q=${exactNameParams}" target="_blank" class="scan-btn">
-                                <span><i class="ri-scales-3-line brand"></i> Jusbrasil Processos</span>
-                                <i class="ri-external-link-line arrow"></i>
+                                <span><i class="ri-scales-3-line"></i> Verificar Judiciário</span>
                             </a>
                             <a href="https://www.escavador.com/busca?q=${exactNameParams}" target="_blank" class="scan-btn">
-                                <span><i class="ri-article-line brand"></i> Escavador / Diário Oficial</span>
-                                <i class="ri-external-link-line arrow"></i>
-                            </a>
-                            <a href="https://portaldatransparencia.gov.br/busca?termo=${exactNameParams}" target="_blank" class="scan-btn">
-                                <span><i class="ri-bank-card-line brand"></i> Portal da Transparência</span>
-                                <i class="ri-external-link-line arrow"></i>
+                                <span><i class="ri-article-line"></i> Verificar Receita / Diários Oficiais</span>
                             </a>
                         </div>
                     </div>
 
-                    <!-- Buscadores Profundos -->
                     <div class="tool-category">
-                        <h3><i class="ri-global-line"></i> Varredura Profunda na Web</h3>
+                        <h3>Redes Sociais Stricto</h3>
                         <div class="link-list">
-                            <a href="https://www.google.com/search?q=${exactNameParams}" target="_blank" class="scan-btn">
-                                <span><i class="ri-google-fill brand" style="color: #ea4335;"></i> Google Search Dorks</span>
-                                <i class="ri-external-link-line arrow"></i>
+                            <a href="https://www.linkedin.com/search/results/all/?keywords=${exactNameParams}" target="_blank" class="scan-btn">
+                                <span><i class="ri-linkedin-box-fill"></i> LinkedIn Profissional</span>
                             </a>
-                            <a href="https://duckduckgo.com/?q=${exactNameParams}" target="_blank" class="scan-btn">
-                                <span><i class="ri-search-eye-line brand" style="color: #DE5833;"></i> DuckDuckGo Tracker</span>
-                                <i class="ri-external-link-line arrow"></i>
+                            <a href="https://www.instagram.com/explore/search/keyword/?q=${encodedName}" target="_blank" class="scan-btn">
+                                <span><i class="ri-instagram-line"></i> Instagram Publico</span>
                             </a>
                         </div>
                     </div>
@@ -136,14 +180,5 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         resultsContent.innerHTML = html;
-        loader.classList.add('hidden');
-        noResults.classList.add('hidden');
-        resultsContent.classList.remove('hidden');
-    }
-
-    function showLoader() {
-        resultsContent.classList.add('hidden');
-        noResults.classList.add('hidden');
-        loader.classList.remove('hidden');
     }
 });
