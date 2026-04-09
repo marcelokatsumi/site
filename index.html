@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Busca de Pessoas</title>
+    <title>Painel de Investigação Global</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,24 +14,29 @@
     <div class="main-container">
         <header>
             <div class="logo">
-                <i class="ri-search-eye-line"></i>
-                <h1>Finder</h1>
+                <i class="ri-radar-line"></i>
+                <h1>DataWeb Search</h1>
             </div>
-            <p>Busque informações públicas ou figuras notórias</p>
+            <p>Busque dados públicos, processos e redes sociais de qualquer nome em tempo real</p>
         </header>
 
         <section class="search-section">
             <div class="search-wrapper">
-                <i class="ri-search-line search-icon"></i>
-                <input type="text" id="searchInput" placeholder="Busque por pessoas reais (Ex: Neymar, Silvio Santos, Einstein...)" autocomplete="off">
-                <button id="searchBtn">Pesquisar</button>
+                <i class="ri-user-search-line search-icon"></i>
+                <input type="text" id="searchInput" placeholder="Digite o nome completo de qualquer pessoa..." autocomplete="off">
+                <button id="searchBtn">Rastrear</button>
             </div>
         </section>
 
         <section id="resultsContainer" class="results-container">
             <div id="loader" class="loader hidden">
                 <div class="spinner"></div>
-                <p>Buscando na base de dados global...</p>
+                <p>Mapeando pegadas digitais na internet...</p>
+                <div class="loading-steps">
+                    <span><i class="ri-check-line"></i> Conectando a redes sociais...</span>
+                    <span><i class="ri-check-line"></i> Consultando registros jurídicos...</span>
+                    <span><i class="ri-check-line"></i> Verificando motores de busca...</span>
+                </div>
             </div>
 
             <div id="resultsContent" class="results-content hidden">
@@ -40,10 +45,10 @@
 
             <div id="noResults" class="no-results hidden">
                 <div class="icon-circle">
-                    <i class="ri-user-unfollow-line"></i>
+                    <i class="ri-error-warning-line"></i>
                 </div>
-                <h2>Pessoa não encontrada</h2>
-                <p>Tente digitar o nome completo e correto. Lembre-se, sistemas públicos focam muito em pessoas com presença pública.</p>
+                <h2>Termo inválido</h2>
+                <p>Por favor, insira um nome válido para rastrear pela internet.</p>
             </div>
         </section>
     </div>
