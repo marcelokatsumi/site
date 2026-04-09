@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OmniSearch | Busca de Dados</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+</head>
+<body>
+    <div class="background-elements">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <main class="container">
+        <header>
+            <div class="logo">
+                <i class="ri-global-line"></i>
+                <h1>Omni<span>Search</span></h1>
+            </div>
+            <p>Sistema Avançado de Pesquisa de Indivíduos</p>
+        </header>
+
+        <section class="search-section">
+            <div class="search-bar-container">
+                <i class="ri-search-2-line search-icon"></i>
+                <input type="text" id="searchInput" placeholder="Digite o nome, e-mail ou documento..." autocomplete="off">
+                <button id="searchBtn">Buscar</button>
+            </div>
+        </section>
+
+        <section class="results-container" id="resultsContainer">
+            <div class="loader" id="loader">
+                <div class="spinner"></div>
+                <p>Buscando em bases de dados globais...</p>
+            </div>
+            
+            <div id="resultsContent" class="results-content hidden">
+                <!-- Resultados serão preenchidos via JS -->
+            </div>
+
+            <div id="noResults" class="no-results hidden">
+                <i class="ri-error-warning-line"></i>
+                <h2>Nenhum registro encontrado</h2>
+                <p>O termo pesquisado não consta em nosso banco de dados atual.</p>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
