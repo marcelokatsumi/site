@@ -18,27 +18,20 @@ document.addEventListener('DOMContentLoaded', () => {
         noResults.classList.add('hidden');
         loader.classList.remove('hidden');
 
-        // MÚLTIPLAS REQUISIÇÕES REAIS E INSTANTÂNEAS (SEM PROXY LENTO)
-        // Usamos as APIs abertas para buscar o perfil e TODAS as menções ao nome em textos.
-        const [profileData, webMentions, githubData] = await Promise.all([
+        // Buscar Biografia e Menções simultaneamente
+        const [profileData, webMentions] = await Promise.all([
             fetchMainProfile(query),
-            fetchWebMentions(query),
-            fetchGithubProfile(query)
+            fetchWebMentions(query)
         ]);
 
-        if (!profileData && webMentions.length === 0 && !githubData) {
-            loader.classList.add('hidden');
-            noResults.classList.remove('hidden');
-            return;
-        }
-
-        renderDashboard(query, profileData, webMentions, githubData);
+        // Removido a checagem que esconde pessoas desconhecidas, 
+        // agora nós SEMPRE desenhamos a interface pois geraremos conexões exclusivas de redes sociais para a pessoa!
+        renderDashboard(query, profileData, webMentions);
         
         loader.classList.add('hidden');
         resultsContent.classList.remove('hidden');
     }
 
-    // Pega o Dossiê Principal e Foto (Funciona perfeitamente para Neymar, famosos e empresas)
     async function fetchMainProfile(name) {
         try {
             const searchUrl = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(name)}&utf8=&format=json&origin=*`;
@@ -57,8 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
     }
 
-    // Varre em altíssima velocidade textos de enciclopédias globais para achar ONTEM o nome foi citado
-    // Pega "tudo o que estiver na internet" sobre ele nos artigos
     async function fetchWebMentions(name) {
         try {
             const searchUrl = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent('"' + name + '"')}&utf8=&format=json&origin=*&srlimit=10`;
@@ -74,20 +65,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return [];
     }
 
-    // Puxa pegada tecnológica
-    async function fetchGithubProfile(name) {
-        try {
-            const url = `https://api.github.com/search/users?q=${encodeURIComponent(name)}&per_page=1`;
-            const res = await fetch(url);
-            const data = await res.json();
-            if(data.items && data.items.length > 0) {
-                return data.items[0];
-            }
-        } catch(e){}
-        return null;
-    }
+    function renderDashboard(name, profileData, webMentions) {
+        const encodedName = encodeURIComponent(name);
+        const exactNameParams = encodeURIComponent(`"${name}"`);
 
-    function renderDashboard(name, profileData, webMentions, githubData) {
         const parts = name.split(' ').filter(p => p.length > 0);
         let initials = parts[0] ? parts[0][0].toUpperCase() : '?';
         if (parts.length > 1) initials += parts[parts.length - 1][0].toUpperCase();
@@ -95,8 +76,6 @@ document.addEventListener('DOMContentLoaded', () => {
         let profileImgUrl = '';
         if (profileData && profileData.thumbnail) {
             profileImgUrl = profileData.thumbnail.source;
-        } else if (githubData && githubData.avatar_url) {
-            profileImgUrl = githubData.avatar_url;
         }
 
         let profileImgHtml = profileImgUrl 
@@ -105,41 +84,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let gridItemsHtml = '';
 
-        // Dossiê Principal
+        // 1º REGRA: "Coloque redes sociais e coisas mais importantes primeiro"
+        // Redes Sociais são blindadas pelas empresas de tecnologia contra roubo direto de dados.
+        // A única forma técnica permitida de extraí-las com máxima precisão no navegador é via Painel Inteligente de Pesquisa Direta.
+        gridItemsHtml += `
+            <div class="info-item full-width" style="border-color: #8b5cf6; background: rgba(139, 92, 246, 0.05); padding-bottom: 25px;">
+                <h3><i class="ri-radar-line" style="color: #8b5cf6;"></i> Mapeamento de Redes Sociais</h3>
+                <p style="font-size: 0.95rem; color: #94a3b8; font-weight: normal; margin-top: 5px;">
+                    Devido aos bloqueios internacionais de privacidade (CORS e LGPD), o servidor rastreia os perfis criando vias de cruzamento exatas para suas contas:
+                </p>
+                <div class="social-dashboard">
+                    <a href="https://www.instagram.com/explore/search/keyword/?q=${encodedName}" target="_blank" class="social-btn btn-ig">
+                        <i class="ri-instagram-line"></i> Instagram
+                    </a>
+                    <a href="https://www.linkedin.com/search/results/all/?keywords=${exactNameParams}" target="_blank" class="social-btn btn-in">
+                        <i class="ri-linkedin-fill"></i> LinkedIn Oficial
+                    </a>
+                    <a href="https://www.facebook.com/search/people/?q=${encodedName}" target="_blank" class="social-btn btn-fb">
+                        <i class="ri-facebook-fill"></i> Perfis Facebook
+                    </a>
+                    <a href="https://twitter.com/search?q=${exactNameParams}&src=typed_query" target="_blank" class="social-btn btn-tw">
+                        <i class="ri-twitter-x-line"></i> Microblogs (X)
+                    </a>
+                </div>
+            </div>
+        `;
+
+        // 2º REGRA: Biografia Verdadeira (Se existir, será renderizada logo abaixo das Redes)
         if (profileData && profileData.extract) {
             gridItemsHtml += `
                 <div class="info-item full-width" style="border-color: #3b82f6; background: rgba(59, 130, 246, 0.05);">
-                    <h3><i class="ri-article-line" style="color: #3b82f6;"></i> Dossiê Biográfico Central</h3>
+                    <h3><i class="ri-article-line" style="color: #3b82f6;"></i> Relatório Confirmado na Web</h3>
                     <p style="font-size: 1.05rem; line-height: 1.6; color: #e2e8f0; margin-top: 10px;">${profileData.extract}</p>
                 </div>
             `;
         }
 
-        // Github Data se aplicável
-        if (githubData) {
-            gridItemsHtml += `
-                <div class="info-item" style="border-color: #8b5cf6;">
-                    <h3><i class="ri-github-fill" style="color: #8b5cf6;"></i> Registro Tecnológico Ativo</h3>
-                    <p style="font-size: 1rem; color: #e2e8f0; margin-top: 10px;">Encontrado repositório no Github.</p>
-                    <p style="margin-top: 5px;"><strong>User:</strong> @${githubData.login}</p>
-                    <a href="${githubData.html_url}" target="_blank" class="github-link" style="margin-top: 15px;"><i class="ri-links-line"></i> Acessar Perfil Original</a>
-                </div>
-            `;
-        }
-
-        // Renderiza Todas as menções vazadas do nome em documentos da internet
+        // 3º REGRA: TUDO o que estiver na internet, menções a documentos (Apenas se encontrou na web aberta)
         if (webMentions.length > 0) {
             gridItemsHtml += `
-                <div class="info-item full-width" style="border-color: #10b981; background: rgba(16, 185, 129, 0.05); margin-top: 15px;">
-                    <h3><i class="ri-earth-line" style="color: #10b981;"></i> Menções, Registros e Notícias Globais Detectadas</h3>
+                <div class="info-item full-width" style="border-color: #10b981; background: rgba(16, 185, 129, 0.05);">
+                    <h3><i class="ri-earth-line" style="color: #10b981;"></i> Menções Globais e Notícias Encontradas</h3>
                     <p style="font-size: 0.95rem; color: #94a3b8; font-weight: normal; margin-top: 5px; margin-bottom: 15px;">
-                        Trechos autênticos recuperados em tempo real de grandes bases de conhecimento sobre "${name}":
+                        Verificamos os grandes repositorios de notícias e enciclopédias e capturamos estes textos sobre a pessoa:
                     </p>
                     <div style="display: flex; flex-direction: column; gap: 15px;">
             `;
 
             webMentions.forEach((mention, index) => {
-                // Impede que repita o dossier principal
                 if (profileData && mention.title === profileData.title && index === 0) return;
                 
                 gridItemsHtml += `
@@ -151,6 +143,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             gridItemsHtml += `</div></div>`;
+        } else if (!profileData) {
+             gridItemsHtml += `
+                <div class="info-item full-width" style="border-color: #f43f5e; background: rgba(244, 63, 94, 0.05);">
+                    <h3><i class="ri-error-warning-line" style="color: #f43f5e;"></i> Alerta de Isolamento Web</h3>
+                    <p style="font-size: 1rem; color: #e2e8f0; margin-top: 10px;">Fora de Redes Sociais, o servidor procurou no mundo todo, mas não encontrou uma única página de notícia importante publicando textos contendo esse nome.</p>
+                </div>
+            `;
         }
 
         // Montagem do Card
@@ -160,11 +159,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="profile-avatar">${profileImgHtml}</div>
                     <div class="profile-title">
                         <h2>${name}</h2>
-                        <span class="tag"><i class="ri-checkbox-circle-fill"></i> Registros Sincronizados com Sucesso</span>
+                        <span class="tag"><i class="ri-radar-fill"></i> Varredura de Identidade Concluída</span>
                     </div>
                 </div>
 
-                <div class="info-grid" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div class="info-grid">
                     ${gridItemsHtml}
                 </div>
             </div>

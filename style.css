@@ -330,22 +330,45 @@ button:active {
     font-weight: 500;
 }
 
-.github-link {
-    color: var(--accent);
-    text-decoration: none;
-    background: rgba(59, 130, 246, 0.1);
-    padding: 10px 20px;
-    border-radius: 8px;
-    display: inline-block;
-    margin-top: 10px;
-    transition: all 0.2s;
-    border: 1px solid var(--accent);
+/* Estilos de Redes Sociais Diretas */
+.social-dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 15px;
 }
 
-.github-link:hover {
-    background: var(--accent);
+.social-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 12px;
+    text-decoration: none;
     color: white;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.3s;
+    border: 1px solid rgba(255,255,255,0.1);
 }
+
+.social-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.btn-ig { background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
+.btn-ig:hover { box-shadow: 0 5px 15px rgba(220, 39, 67, 0.4); }
+
+.btn-in { background: #0077b5; }
+.btn-in:hover { box-shadow: 0 5px 15px rgba(0, 119, 181, 0.4); }
+
+.btn-fb { background: #1877f2; }
+.btn-fb:hover { box-shadow: 0 5px 15px rgba(24, 119, 242, 0.4); }
+
+.btn-tw { background: #000000; border-color: #333; }
+.btn-tw:hover { box-shadow: 0 5px 15px rgba(255, 255, 255, 0.1); }
 
 /* Animations */
 @keyframes spin {
