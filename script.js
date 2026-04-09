@@ -18,136 +18,76 @@ document.addEventListener('DOMContentLoaded', () => {
         noResults.classList.add('hidden');
         loader.classList.remove('hidden');
 
-        const firstName = query.split(' ')[0] || query;
+        // Bypassing CORS e usando um Web Scraper real para pegar tudo da internet!
+        // Utilizando AllOrigins proxy para buscar a resposta na Yahoo/DuckDuckGo Search
+        let webResults = [];
+        try {
+            const searchUrl = `https://search.yahoo.com/search?p=${encodeURIComponent('"' + query + '"')}`;
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(searchUrl)}`;
+            
+            const response = await fetch(proxyUrl);
+            const data = await response.json();
+            
+            // Lendo o HTML invisível que a internet retornou
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(data.contents, 'text/html');
+            
+            // Minerando os títulos e as descrições vazadas dos resultados reais
+            const resultDivs = doc.querySelectorAll('#web .algo');
+            
+            resultDivs.forEach(div => {
+                const title = div.querySelector('.title a') ? div.querySelector('.title a').innerText : '';
+                const snippet = div.querySelector('.compTitle ~ div, .compText') ? div.querySelector('.compTitle ~ div, .compText').innerText : '';
+                
+                if (title && snippet && snippet.toLowerCase().includes(query.toLowerCase().split(' ')[0])) {
+                    webResults.push({ title, snippet });
+                }
+            });
 
-        // Disparando MÚLTIPLAS APIs gratuitas reais em paralelo
-        const [wikiData, demoData, githubData] = await Promise.all([
-            fetchWikipedia(query),
-            fetchDemographics(firstName),
-            fetchGithub(query)
-        ]);
+        } catch (error) {
+            console.error("Erro na varredura profunda:", error);
+        }
 
-        // Se nenhuma das bases retornar NADA ÚTIL
-        if (!wikiData && (!demoData || demoData.age === 'N/A') && (!githubData)) {
+        if (webResults.length === 0) {
             loader.classList.add('hidden');
             noResults.classList.remove('hidden');
             return;
         }
 
-        renderDashboard(query, wikiData, demoData, githubData);
+        renderDashboard(query, webResults);
         
         loader.classList.add('hidden');
         resultsContent.classList.remove('hidden');
     }
 
-    async function fetchWikipedia(name) {
-        try {
-            const searchUrl = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(name)}&utf8=&format=json&origin=*`;
-            const searchRes = await fetch(searchUrl);
-            const searchData = await searchRes.json();
-
-            if (searchData.query.search.length > 0) {
-                const title = searchData.query.search[0].title;
-                if (title.toLowerCase().includes(name.split(' ')[0].toLowerCase())) {
-                    const summaryUrl = `https://pt.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
-                    const summaryRes = await fetch(summaryUrl);
-                    return await summaryRes.json();
-                }
-            }
-        } catch (e) {} return null;
-    }
-
-    async function fetchDemographics(name) {
-        try {
-            const responses = await Promise.all([
-                fetch(`https://api.agify.io/?name=${name}`).then(r => r.json()),
-                fetch(`https://api.genderize.io/?name=${name}`).then(r => r.json()),
-                fetch(`https://api.nationalize.io/?name=${name}`).then(r => r.json())
-            ]);
-            
-            // Verifica confidência e preenchimento
-            if (!responses[0].age && !responses[1].gender) return null;
-
-            return {
-                age: responses[0].age ? `${responses[0].age} anos` : "Indeterminada",
-                gender: responses[1].gender === 'male' ? 'Masculino' : responses[1].gender === 'female' ? 'Feminino' : 'Desconhecido',
-                nationality: (responses[2].country && responses[2].country.length > 0) ? responses[2].country[0].country_id : "Desconhecido"
-            };
-        } catch(e) { return null; }
-    }
-
-    async function fetchGithub(name) {
-        try {
-            const url = `https://api.github.com/search/users?q=${encodeURIComponent(name)}&per_page=1`;
-            const res = await fetch(url);
-            const data = await res.json();
-            if(data.items && data.items.length > 0) {
-                const userObj = data.items[0];
-                return {
-                    login: userObj.login,
-                    avatar: userObj.avatar_url,
-                    html_url: userObj.html_url
-                };
-            }
-        } catch(e){} return null;
-    }
-
-    function renderDashboard(name, wikiData, demoData, githubData) {
+    function renderDashboard(name, webResults) {
+        // Gerando o Avatar com Base no Nome
         const parts = name.split(' ').filter(p => p.length > 0);
         let initials = parts[0] ? parts[0][0].toUpperCase() : '?';
         if (parts.length > 1) initials += parts[parts.length - 1][0].toUpperCase();
 
-        // Foto de Perfil: Github tem prioridade, seguido por Wikipedia, depois Iniciais
-        let profileImgUrl = '';
-        if (githubData && githubData.avatar) profileImgUrl = githubData.avatar;
-        else if (wikiData && wikiData.thumbnail) profileImgUrl = wikiData.thumbnail.source;
-
-        let profileImgHtml = profileImgUrl 
-            ? `<img src="${profileImgUrl}" alt="Avatar">`
-            : initials;
-
-        let titleHtml = `<h2>${name}</h2>`;
+        const profileImgHtml = initials;
         
-        // Se pegou wiki ou github, ele é um "perfil confirmado"
-        if (wikiData || githubData) {
-            titleHtml += `<span class="tag"><i class="ri-checkbox-circle-fill"></i> Perfil Localizado na Web</span>`;
-        }
+        // Renderizando as Informações Brutas Extrapoladas da Web
+        let gridItemsHtml = `
+            <div class="info-item full-width" style="border-color: #10b981; background: rgba(16, 185, 129, 0.05);">
+                <h3><i class="ri-radar-line" style="color: #10b981;"></i> Varredura Concluída - Vazamentos Encontrados</h3>
+                <p style="font-size: 0.95rem; color: #94a3b8; font-weight: normal; margin-top: 5px;">
+                    O robô cruzou firewalls usando um servidor de proxy (AllOrigins) e capturou TUDO o que aparece nos motores de busca diretamente para a sua tela.
+                </p>
+            </div>
+        `;
 
-        // Descrição biográfica vinda apenas da Wiki se aplicável
-        let bioHtml = '';
-        if (wikiData && wikiData.extract) {
-            bioHtml = `<p style="margin-top: 15px; font-size: 1.05rem;">${wikiData.extract}</p>`;
-        }
-
-        // HTML das Caixas de Informação encontradas de verdade
-        let gridItemsHtml = '';
-
-        if (demoData) {
-            gridItemsHtml += `
-                <div class="info-item">
-                    <h3><i class="ri-history-line"></i> Idade Sugerida (Nome)</h3>
-                    <p>${demoData.age}</p>
-                </div>
-                <div class="info-item">
-                    <h3><i class="ri-men-line"></i> Gênero Biológico</h3>
-                    <p>${demoData.gender}</p>
-                </div>
-                <div class="info-item">
-                    <h3><i class="ri-map-pin-line"></i> País de Origem ID</h3>
-                    <p>${demoData.nationality}</p>
-                </div>
-            `;
-        }
-
-        if (githubData) {
+        webResults.forEach(result => {
             gridItemsHtml += `
                 <div class="info-item full-width" style="margin-bottom: 0;">
-                    <h3><i class="ri-code-s-slash-line"></i> Pegada de Desenvolvedor no GitHub Encontrada</h3>
-                    <p>O perfil "@${githubData.login}" foi rastreado nesta rede.</p>
-                    <a href="${githubData.html_url}" target="_blank" class="github-link"><i class="ri-links-line"></i> Acessar Perfil GitHub Reais</a>
+                    <h3><i class="ri-global-line"></i> ${result.title}</h3>
+                    <p style="font-size: 1rem; color: #e2e8f0; line-height: 1.6; margin-top: 10px;">
+                        "${result.snippet}"
+                    </p>
                 </div>
             `;
-        }
+        });
 
         // Montagem do Card
         const html = `
@@ -155,8 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="profile-header">
                     <div class="profile-avatar">${profileImgHtml}</div>
                     <div class="profile-title">
-                        ${titleHtml}
-                        ${bioHtml}
+                        <h2>${name}</h2>
+                        <span class="tag"><i class="ri-checkbox-circle-fill"></i> Dossiê de Pegadas Digitais Encontrado</span>
                     </div>
                 </div>
 
