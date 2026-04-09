@@ -1,53 +1,3 @@
-// Banco de dados fictício para simulação
-const mockDatabase = [
-    {
-        name: "Carlos Eduardo Silva",
-        document: "123.456.789-00",
-        email: "carlos.silva.dev@email.com",
-        phone: "+55 (11) 98765-4321",
-        address: "Rua das Laranjeiras, 145, Apartamento 12, São Paulo - SP",
-        dob: "15/04/1988",
-        status: "Ativo",
-        profession: "Engenheiro de Software",
-        company: "TechNova Solutions",
-        social: {
-            linkedin: "#",
-            github: "#",
-            twitter: "#"
-        }
-    },
-    {
-        name: "Ana Júlia Costa",
-        document: "987.654.321-11",
-        email: "anaj.costa@email.com",
-        phone: "+55 (21) 97777-8888",
-        address: "Av. Atlântica, 444, Rio de Janeiro - RJ",
-        dob: "22/11/1992",
-        status: "Ativo",
-        profession: "Designer UX/UI",
-        company: "Creative Studio BR",
-        social: {
-            linkedin: "#",
-            dribbble: "#",
-            instagram: "#"
-        }
-    },
-    {
-        name: "João Pedro Santos",
-        document: "111.222.333-44",
-        email: "joao.santos@email.com",
-        phone: "+55 (31) 96666-5555",
-        address: "Rua da Bahia, 1020, Belo Horizonte - MG",
-        dob: "05/01/1985",
-        status: "Ativo",
-        profession: "Analista Financeiro",
-        company: "Banco InvestCorp",
-        social: {
-            linkedin: "#"
-        }
-    }
-];
-
 document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('searchInput');
     const searchBtn = document.getElementById('searchBtn');
@@ -55,106 +5,99 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsContent = document.getElementById('resultsContent');
     const noResults = document.getElementById('noResults');
 
-    // Inicialização do estado
-    loader.classList.add('hidden');
-
     searchBtn.addEventListener('click', handleSearch);
     searchInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleSearch();
     });
 
-    function handleSearch() {
-        const query = searchInput.value.trim().toLowerCase();
-        
+    async function handleSearch() {
+        const query = searchInput.value.trim();
         if (!query) return;
 
-        // Limpa resultados e exibe o loader (simula requisição HTTP à API)
-        resultsContent.classList.add('hidden');
-        noResults.classList.add('hidden');
-        loader.classList.remove('hidden');
+        showLoader();
 
-        // Simulando delay de rede de API
-        setTimeout(() => {
-            loader.classList.add('hidden');
-            
-            // Busca no banco mockado (busca por trecho do nome ou documento)
-            const result = mockDatabase.find(person => 
-                person.name.toLowerCase().includes(query) || 
-                person.document.replace(/[^\d]/g, '').includes(query.replace(/[^\d]/g, '')) ||
-                person.email.toLowerCase().includes(query)
-            );
+        try {
+            // Puxando dados REAIS usando a API da Wikipedia em português
+            // 1. Procurar pela pessoa para pegar o título exato da página
+            const searchUrl = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json&origin=*`;
+            const searchRes = await fetch(searchUrl);
+            const searchData = await searchRes.json();
 
-            if (result) {
-                renderProfile(result);
-            } else {
-                noResults.classList.remove('hidden');
+            if (searchData.query.search.length === 0) {
+                showNoResults();
+                return;
             }
-        }, 1500);
+
+            // Pega o título da primeira correspondência (a pessoa real)
+            const title = searchData.query.search[0].title;
+
+            // 2. Buscar o Resumo (Summary) e Imagem reais da pessoa
+            const summaryUrl = `https://pt.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
+            const summaryRes = await fetch(summaryUrl);
+            const summaryData = await summaryRes.json();
+
+            if (summaryData.type === 'disambiguation' || !summaryData.extract) {
+                showNoResults();
+                return;
+            }
+
+            renderProfile(summaryData);
+
+        } catch (error) {
+            console.error("Erro ao buscar informações:", error);
+            showNoResults();
+        }
     }
 
     function renderProfile(data) {
-        // Obter iniciais do nome
-        const initials = data.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
-
-        // Construir ícones de redes sociais dinâmico
-        let socialHTML = '';
-        if (data.social.linkedin) socialHTML += `<a href="${data.social.linkedin}" title="LinkedIn"><i class="ri-linkedin-fill"></i></a>`;
-        if (data.social.github) socialHTML += `<a href="${data.social.github}" title="GitHub"><i class="ri-github-fill"></i></a>`;
-        if (data.social.twitter) socialHTML += `<a href="${data.social.twitter}" title="Twitter"><i class="ri-twitter-x-fill"></i></a>`;
-        if (data.social.instagram) socialHTML += `<a href="${data.social.instagram}" title="Instagram"><i class="ri-instagram-line"></i></a>`;
-        if (data.social.dribbble) socialHTML += `<a href="${data.social.dribbble}" title="Dribbble"><i class="ri-dribbble-line"></i></a>`;
+        // Dados reais puxados da API
+        const nome = data.title;
+        const descricao = data.description || "Personalidade / Figura Pública";
+        const biografia = data.extract;
+        const urlWiki = data.content_urls.desktop.page;
+        
+        let imgHtml = '';
+        if (data.thumbnail && data.thumbnail.source) {
+            imgHtml = `<img src="${data.thumbnail.source}" alt="Foto de ${nome}" class="profile-img">`;
+        } else {
+            imgHtml = `<div class="profile-avatar-placeholder"><i class="ri-user-line"></i></div>`;
+        }
 
         const html = `
             <div class="profile-card">
-                <div class="profile-header">
-                    <div class="profile-avatar">${initials}</div>
-                    <div class="profile-title">
-                        <h2>${data.name}</h2>
-                        <span class="tag"><i class="ri-checkbox-circle-fill"></i> Perfil Verificado</span>
-                    </div>
-                </div>
-
-                <div class="info-grid">
-                    <div class="info-item">
-                        <h3><i class="ri-id-card-line"></i> Documento Oficial</h3>
-                        <p>${data.document}</p>
-                    </div>
-                    <div class="info-item">
-                        <h3><i class="ri-mail-line"></i> E-mail</h3>
-                        <p>${data.email}</p>
-                    </div>
-                    <div class="info-item">
-                        <h3><i class="ri-phone-line"></i> Telefone</h3>
-                        <p>${data.phone}</p>
-                    </div>
-                    <div class="info-item">
-                        <h3><i class="ri-calendar-event-line"></i> Data de Nascimento</h3>
-                        <p>${data.dob}</p>
-                    </div>
-                    <div class="info-item">
-                        <h3><i class="ri-briefcase-4-line"></i> Profissão</h3>
-                        <p>${data.profession}</p>
-                    </div>
-                    <div class="info-item">
-                        <h3><i class="ri-building-line"></i> Empresa</h3>
-                        <p>${data.company}</p>
-                    </div>
-                    <div class="info-item" style="grid-column: 1 / -1;">
-                        <h3><i class="ri-map-pin-line"></i> Endereço Completo</h3>
-                        <p>${data.address}</p>
-                    </div>
-                </div>
-
-                <div class="info-item" style="margin-bottom: 0;">
-                    <h3><i class="ri-links-line"></i> Pegadas Digitais Encontradas</h3>
-                    <div class="social-links" style="margin-top: 10px;">
-                        ${socialHTML}
+                ${imgHtml}
+                <div class="profile-info">
+                    <h2 class="profile-name">${nome}</h2>
+                    <p class="profile-desc">${descricao}</p>
+                    <p class="profile-bio">${biografia}</p>
+                    
+                    <div class="actions">
+                        <a href="${urlWiki}" target="_blank" class="btn-secondary">
+                            <i class="ri-article-line"></i> Relatório Completo
+                        </a>
+                        <a href="https://www.google.com/search?q=${encodeURIComponent(nome)}" target="_blank" class="btn-secondary">
+                            <i class="ri-google-fill"></i> Procurar na Web
+                        </a>
                     </div>
                 </div>
             </div>
         `;
 
         resultsContent.innerHTML = html;
+        loader.classList.add('hidden');
+        noResults.classList.add('hidden');
         resultsContent.classList.remove('hidden');
+    }
+
+    function showLoader() {
+        resultsContent.classList.add('hidden');
+        noResults.classList.add('hidden');
+        loader.classList.remove('hidden');
+    }
+
+    function showNoResults() {
+        loader.classList.add('hidden');
+        resultsContent.classList.add('hidden');
+        noResults.classList.remove('hidden');
     }
 });
